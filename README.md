@@ -11,12 +11,14 @@
 .
 ├── frontend/                 Vue 3 + Vite + TypeScript 前端
 │   ├── src/views/WorkbenchView.vue|tsx  全部模块共享工作台
-│   ├── src/data/modules.ts              18个业务模块配置
+│   ├── src/data/modules.ts              业务模块配置（含异常样本定位）
 │   ├── src/api/              统一请求封装
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/sample_locator.py  异常样本定位/补录/抽验接口
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
+│   ├── app/services/sample_locator.py  分片差额定位与统计抽验
 │   ├── app/services/base.py     共享服务骨架
 │   └── app/store.py          内存数据仓库与示例数据
 ├── .gitignore
@@ -68,6 +70,7 @@ npm run dev
 | 来源认证 | `source_auth` | 认证凭证 | 凭证标识、来源站点、认证方式 |
 | HTML清洗 | `html_cleaner` | 清洗模板 | 模板标识、适用站点、标签过滤 |
 | 增量同步 | `incremental_sync` | 同步水位 | 水位标识、来源配置、增量字段 |
+| 异常样本定位 | `sample_locator` | 异常样本 | 清单编号、采集来源、分片、差额 |
 
 ## 约定
 
@@ -79,3 +82,33 @@ npm run dev
 
 领域：数据工程
 子方向：数据采集、爬虫与RPA
+
+## 异常样本定位清单
+
+批次追踪只记录整批总数，不提供「按批次差额定位到分片」的入口。异常样本定位清单
+（`/sample_locator`）把结果存储中实际落库批次的 `分片统计` 展开成按分片一行的清单：
+
+- **按采集来源 + 批次标识 + 分片唯一定位**：同一批次标签来自不同采集来源时是两份
+  独立落库批次，必须带采集来源分别定位，不会互相覆盖。
+- **筛选**：支持 `采集来源`、`未齐类型`（`原始行缺失` / `有效行不足`）、`批次标识`、
+  `keyword` 和分页；差额为 0 的分片不进入清单。
+- **筛选快照**：列表响应同时返回覆盖全部筛选结果的 `快照`，不受当前页影响；提交抽验
+  时用它冻结「筛选时差额」和「筛选时统计版本」。
+- **补录迟到统计**：`POST /api/sample_locator/supplement` 按来源写回某片的原始/有效行数，
+  统计版本自动递增（值未变化时不升版本），并回写批次合计。
+- **提交抽验**：`POST /api/sample_locator/spotcheck` 按快照提交：
+  - 提交时仍有差额的分片进入采用范围，读取的是该来源实际落库批次的统计；
+  - 提交前已补齐的分片默认不纳入；传 `保留历史对照` 可把它们留在记录里；
+  - 记录同时保存筛选时差额/版本、实际差额/版本、触发前后范围，可逐批次复核；
+  - `结果存储` 字段的统计、来源和路径只反映实际采用的抽验范围。
+
+相关接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/sample_locator` | 分片清单 + 冻结快照 |
+| GET | `/api/sample_locator/options` | 来源与未齐类型下拉 |
+| GET | `/api/sample_locator/batch` | 按来源读取实际落库批次统计 |
+| POST | `/api/sample_locator/supplement` | 补录分片迟到统计 |
+| POST | `/api/sample_locator/spotcheck` | 按快照提交统计抽验 |
+| GET | `/api/sample_locator/records` | 抽验记录 |

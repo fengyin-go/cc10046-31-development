@@ -200,6 +200,17 @@ export const MODULES: ModuleMeta[] = [
     actionTargets: {"触发同步": "待启动", "重置水位": "同步中断"},
     metrics: ["水位总数", "已同步水位", "待启动水位"],
   },
+  {
+    key: "sample_locator",
+    name: "异常样本定位",
+    entity: "异常样本",
+    desc: "按采集来源和未齐类型定位批次差额所属分片，补录统计并提交统计抽验",
+    fields: ["清单编号", "批次标识", "采集来源", "分片", "分片范围", "原始行数", "有效行数", "差额", "未齐类型文本", "统计版本", "存储路径"],
+    statuses: ["待定位", "待补录", "可抽验", "已抽验"],
+    actions: ["补录统计", "提交抽验"],
+    actionTargets: {"补录统计": "待补录", "提交抽验": "已抽验"},
+    metrics: ["差额分片", "仅有效行不足", "可抽验来源"],
+  },
 ]
 
 export const MODULE_BY_KEY: Map<string, ModuleMeta> = new Map(

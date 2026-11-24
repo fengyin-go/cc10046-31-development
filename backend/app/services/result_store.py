@@ -37,3 +37,29 @@ class ResultStoreService(BaseModuleService):
         }
         rows.append(entry)
         return entry
+
+    def domain_find_batches(self, batch_label: str) -> list[dict]:
+        """按批次标签取实际落库记录；同标签可能对应多个来源批次。"""
+        from app.store import store
+        token = str(batch_label or "").strip()
+        if not token:
+            return []
+        return [
+            row for row in store.rows(self.MODULE)
+            if str(row.get("批次标识", "")).strip() == token
+        ]
+
+    def domain_read_stats(self, batch_label: str, source: str) -> dict | None:
+        """按来源读取实际落库批次的原始行数、有效行数和存储路径。"""
+        for row in self.domain_find_batches(batch_label):
+            if str(row.get("来源配置", "")).strip() == str(source or "").strip():
+                return {
+                    "批次记录": row.get("id"),
+                    "批次标识": row.get("批次标识"),
+                    "采集来源": row.get("来源配置"),
+                    "原始行数": row.get("原始行数"),
+                    "有效行数": row.get("有效行数"),
+                    "存储路径": row.get("存储路径"),
+                    "分片统计": [dict(item) for item in (row.get("分片统计") or [])],
+                }
+        return None
